@@ -1,0 +1,7 @@
+pandas
+matplotlib
+numpy
+momentfm
+torch
+scikit-learn
+scipy

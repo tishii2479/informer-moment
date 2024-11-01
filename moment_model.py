@@ -47,7 +47,7 @@ class MomentModel(Model):
             dim=0,
         ).repeat(x_enc.shape[0], 1)
 
-        output = self.model.forward(x_enc=x_enc, input_mask=mask)
+        output = self.model.forward(x_enc=x_enc.float(), input_mask=mask.float())
         pred = output.reconstruction.squeeze()[
             :, x_enc.shape[1] + self.pred_len - 1
         ]  # 最終時刻からpred_len先の結果を使用する

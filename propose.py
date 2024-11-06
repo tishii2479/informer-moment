@@ -115,7 +115,7 @@ class ProposedModel(Model):
 
         criterion = nn.MSELoss()  # 二乗誤差損失関数に変更
         optimizer = optim.Adam(self.weight_model.parameters(), lr=0.001)  # オプティマイザー
-        num_epochs = 5  # エポック数
+        num_epochs = 1  # エポック数
 
         for epoch in range(num_epochs):
             total_loss = 0

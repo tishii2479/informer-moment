@@ -5,44 +5,7 @@ import numpy as np
 import torch
 from sklearn.preprocessing import StandardScaler
 
-from informer.data.data_loader import (
-    Dataset_ETT_hour,  # type: ignore
-    Dataset_ETT_minute,  # type: ignore
-    Dataset_Pred,  # type: ignore
-)
-
-
-# informer/exp/exp_informer.pyから移植
-def get_data(args: argparse.Namespace, flag: str) -> torch.utils.data.Dataset:
-    data_dict = {
-        "ETTh1": Dataset_ETT_hour,
-        "ETTh2": Dataset_ETT_hour,
-        "ETTm1": Dataset_ETT_minute,
-        "ETTm2": Dataset_ETT_minute,
-    }
-    Data = data_dict[args.data]
-    timeenc = 0 if args.embed != "timeF" else 1
-
-    if flag == "test":
-        freq = args.freq
-    elif flag == "pred":
-        freq = args.detail_freq
-        Data = Dataset_Pred
-    else:
-        freq = args.freq
-    data_set = Data(
-        root_path=args.root_path,
-        data_path=args.data_path,
-        flag=flag,
-        size=[args.seq_len, args.label_len, args.pred_len],
-        features=args.features,
-        target=args.target,
-        inverse=args.inverse,
-        timeenc=timeenc,
-        freq=freq,
-        cols=args.cols,
-    )
-    return data_set
+from Informer2020.exp.exp_informer import get_data
 
 
 def to_dataloader(
@@ -82,7 +45,7 @@ def load_dataset(args: argparse.Namespace) -> tuple[
         test_dataset: torch.utils.data.Dataset,
     )
     """
-    return (get_data(args=args, flag="train"), get_data(args=args, flag="test"))
+    return (get_data(args=args, flag="train")[0], get_data(args=args, flag="test")[0])
 
 
 class Dataset_Custom(torch.utils.data.Dataset):

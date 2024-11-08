@@ -3,8 +3,7 @@ __pycache__
 checkpoints
 data
 *.csv
-
-informer
-Informer2020
+*.log
+*.npy
 
 .ssh

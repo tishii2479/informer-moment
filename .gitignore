@@ -1,9 +1,8 @@
 __pycache__
 .venv
 checkpoints
-data
-*.csv
 *.log
 *.npy
+.DS_Store
 
 .ssh

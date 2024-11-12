@@ -14,7 +14,11 @@ pip install -r requirements.txt
 cd Informer2020
 # コマンドを実行して、Informerの学習をする
 # Informerの学習パラメータはここで設定する
+# ETTh1
 python -u main_informer.py --model informer --data ETTh1 --attn prob --freq h --features S
+# NaturalGas
+python -u main_informer.py --model informer --data NaturalGas --root_path ./data/NaturalGas/ --attn prob --freq h --features S
+
 cd ..
 
 mkdir checkpoints

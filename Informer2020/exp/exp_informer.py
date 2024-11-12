@@ -34,6 +34,7 @@ def get_data(args, flag):
         "ECL": Dataset_Custom,
         "Solar": Dataset_Custom,
         "custom": Dataset_Custom,
+        "NaturalGas": Dataset_Custom,
     }
     Data = data_dict[args.data]
     timeenc = 0 if args.embed != "timeF" else 1

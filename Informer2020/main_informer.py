@@ -223,11 +223,20 @@ def parse_args(arg_str: Optional[str] = None) -> argparse.Namespace:
             "S": [1, 1, 1],
             "MS": [137, 137, 1],
         },
+        # see also: https://www.kaggle.com/datasets/ayan2002/price-and-withdrawals-of-natural-gas
+        "NaturalGas": {
+            "data": "combined_data.csv",
+            "T": "price_value",  # NOTE: administered_price, actual_wdl_gj, actual_inj_gj なども使えるかも？
+            "M": [7, 7, 7],  # TODO: setting
+            "S": [1, 1, 1],  # TODO: setting
+            "MS": [7, 7, 1],  # TODO: setting
+        },
     }
     if args.data in data_parser.keys():
         data_info = data_parser[args.data]
         args.data_path = data_info["data"]
         args.target = data_info["T"]
+        # M, S, MS
         args.enc_in, args.dec_in, args.c_out = data_info[args.features]
 
     args.s_layers = [int(s_l) for s_l in args.s_layers.replace(" ", "").split(",")]

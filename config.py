@@ -1,7 +1,7 @@
 import argparse
 
 # 以下のコマンドを実行したときのargsの中身をコピー
-# python -u main_informer.py --model informer --data ETTh1 --attn prob --freq h --features S
+# python -u main_informer.py --model informer --data ETTh1 --attn prob --freq h --features S  --e_layers 1  --d_layers 1 --dropout 0.3 --learning_rate 0.0001 --embed timeF
 ARGS = argparse.Namespace(
     model="informer",
     data="ETTh1",

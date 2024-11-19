@@ -41,7 +41,7 @@ def load_default_informer(args: argparse.Namespace) -> Informer:
 class InformerModel(Model):
     def __init__(self, args: argparse.Namespace, checkpoint_path: str) -> None:
         self.model = load_default_informer(args)
-        self.model.load_state_dict(torch.load(checkpoint_path))
+        self.model.load_state_dict(torch.load(checkpoint_path), strict=False)
         self.args = args
 
     def predict(

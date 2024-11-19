@@ -55,8 +55,8 @@ def predict_distr_by_sampling(
     model: Model,
     batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> torch.Tensor:
-    sample_size = 10
-    params = {"window_size": 10}
+    sample_size = 30 #30に変更
+    params = {"window_size": 30} #30に変更
     batch = generate_new_batch(
         batch=batch,
         sample_size=sample_size,

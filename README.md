@@ -6,6 +6,22 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## 作業手順
+
+GitHubを使ってコードの管理をしています。
+作業する前と後には、以下のコマンドをターミナルで実行してください。
+なんかエラーが出て進まない場合は、最悪無視でよいです。どこかのタイミングで直します。
+
+```
+# 作業前
+git pull origin main
+
+# 作業後
+git add .
+git commit -m "作業内容を表すメッセージをここに入れる、わかればなんでもよい"
+git push origin main
+```
+
 ## 実験手順
 
 ```

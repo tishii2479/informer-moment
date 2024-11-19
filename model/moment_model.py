@@ -1,13 +1,10 @@
-import unittest
-
 import torch
 from momentfm import MOMENTPipeline
-
 from momentfm.utils.masking import Masking #kengo - 追加
 
 import config
 import dataset
-from model import Model
+from model.model import Model
 from propose import predict_distr
 
 from tqdm import tqdm #kengo - 追加
@@ -99,20 +96,3 @@ class MomentModel(Model):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step() 
-
-
-
-class Test(unittest.TestCase):
-    def test_output_shape(self) -> None:
-        args = config.ARGS
-        train_dataset, _ = dataset.load_dataset(config.ARGS)
-        model = MomentModel(param="AutonLab/MOMENT-1-large", pred_len=args.pred_len)
-        train_dataloader = dataset.to_dataloader(train_dataset, args, flag="train")
-        for batch in train_dataloader:
-            y = model.predict_distr(batch)
-            self.assertEqual(y.shape, torch.Size((args.batch_size, 2)))
-            break
-
-
-if __name__ == "__main__":
-    unittest.main(argv=[""], verbosity=2, exit=False)

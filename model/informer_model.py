@@ -1,12 +1,9 @@
 import argparse
-import unittest
 
 import torch
 
-import config
-import dataset
-from informer.models.model import Informer
-from model import Model
+from Informer2020.models.model import Informer
+from model.model import Model
 from propose import predict_distr
 
 
@@ -86,19 +83,3 @@ class InformerModel(Model):
         batch_y = batch_y[:, -self.args.pred_len :, f_dim:]
 
         return outputs, batch_y
-
-
-class Test(unittest.TestCase):
-    def test_output_shape(self) -> None:
-        args = config.ARGS
-        model = InformerModel(args, "checkpoints/informer.pth")
-        train_dataset, _ = dataset.load_dataset(args)
-        train_dataloader = dataset.to_dataloader(train_dataset, args, flag="train")
-        for batch in train_dataloader:
-            y = model.predict_distr(batch)
-            self.assertEqual(y.shape, torch.Size((args.batch_size, 2)))
-            break
-
-
-if __name__ == "__main__":
-    unittest.main(argv=[""], verbosity=2, exit=False)

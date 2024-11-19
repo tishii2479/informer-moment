@@ -1,3 +1,5 @@
+# type: ignore
+
 import os
 import time
 import warnings
@@ -5,8 +7,11 @@ import warnings
 import numpy as np
 import torch
 import torch.nn as nn
+from models.model import Informer, InformerStack
 from torch import optim
 from torch.utils.data import DataLoader
+from utils.metrics import metric
+from utils.tools import EarlyStopping, adjust_learning_rate
 
 from data.data_loader import (
     Dataset_Custom,
@@ -15,11 +20,63 @@ from data.data_loader import (
     Dataset_Pred,
 )
 from exp.exp_basic import Exp_Basic
-from models.model import Informer, InformerStack
-from utils.metrics import metric
-from utils.tools import EarlyStopping, adjust_learning_rate
 
 warnings.filterwarnings("ignore")
+
+
+def get_data(args, flag):
+    data_dict = {
+        "ETTh1": Dataset_ETT_hour,
+        "ETTh2": Dataset_ETT_hour,
+        "ETTm1": Dataset_ETT_minute,
+        "ETTm2": Dataset_ETT_minute,
+        "WTH": Dataset_Custom,
+        "ECL": Dataset_Custom,
+        "Solar": Dataset_Custom,
+        "custom": Dataset_Custom,
+        "NaturalGas": Dataset_Custom,
+    }
+    Data = data_dict[args.data]
+    timeenc = 0 if args.embed != "timeF" else 1
+
+    if flag == "test":
+        shuffle_flag = False
+        drop_last = True
+        batch_size = args.batch_size
+        freq = args.freq
+    elif flag == "pred":
+        shuffle_flag = False
+        drop_last = False
+        batch_size = 1
+        freq = args.detail_freq
+        Data = Dataset_Pred
+    else:
+        shuffle_flag = True
+        drop_last = True
+        batch_size = args.batch_size
+        freq = args.freq
+    data_set = Data(
+        root_path=args.root_path,
+        data_path=args.data_path,
+        flag=flag,
+        size=[args.seq_len, args.label_len, args.pred_len],
+        features=args.features,
+        target=args.target,
+        inverse=args.inverse,
+        timeenc=timeenc,
+        freq=freq,
+        cols=args.cols,
+    )
+    print(flag, len(data_set))
+    data_loader = DataLoader(
+        data_set,
+        batch_size=batch_size,
+        shuffle=shuffle_flag,
+        num_workers=args.num_workers,
+        drop_last=drop_last,
+    )
+
+    return data_set, data_loader
 
 
 class Exp_Informer(Exp_Basic):
@@ -65,61 +122,6 @@ class Exp_Informer(Exp_Basic):
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
         return model
 
-    def _get_data(self, flag):
-        args = self.args
-
-        data_dict = {
-            "ETTh1": Dataset_ETT_hour,
-            "ETTh2": Dataset_ETT_hour,
-            "ETTm1": Dataset_ETT_minute,
-            "ETTm2": Dataset_ETT_minute,
-            "WTH": Dataset_Custom,
-            "ECL": Dataset_Custom,
-            "Solar": Dataset_Custom,
-            "custom": Dataset_Custom,
-        }
-        Data = data_dict[self.args.data]
-        timeenc = 0 if args.embed != "timeF" else 1
-
-        if flag == "test":
-            shuffle_flag = False
-            drop_last = True
-            batch_size = args.batch_size
-            freq = args.freq
-        elif flag == "pred":
-            shuffle_flag = False
-            drop_last = False
-            batch_size = 1
-            freq = args.detail_freq
-            Data = Dataset_Pred
-        else:
-            shuffle_flag = True
-            drop_last = True
-            batch_size = args.batch_size
-            freq = args.freq
-        data_set = Data(
-            root_path=args.root_path,
-            data_path=args.data_path,
-            flag=flag,
-            size=[args.seq_len, args.label_len, args.pred_len],
-            features=args.features,
-            target=args.target,
-            inverse=args.inverse,
-            timeenc=timeenc,
-            freq=freq,
-            cols=args.cols,
-        )
-        print(flag, len(data_set))
-        data_loader = DataLoader(
-            data_set,
-            batch_size=batch_size,
-            shuffle=shuffle_flag,
-            num_workers=args.num_workers,
-            drop_last=drop_last,
-        )
-
-        return data_set, data_loader
-
     def _select_optimizer(self):
         model_optim = optim.Adam(self.model.parameters(), lr=self.args.learning_rate)
         return model_optim
@@ -142,9 +144,9 @@ class Exp_Informer(Exp_Basic):
         return total_loss
 
     def train(self, setting):
-        train_data, train_loader = self._get_data(flag="train")
-        vali_data, vali_loader = self._get_data(flag="val")
-        test_data, test_loader = self._get_data(flag="test")
+        train_data, train_loader = get_data(self.args, flag="train")
+        vali_data, vali_loader = get_data(self.args, flag="val")
+        test_data, test_loader = get_data(self.args, flag="test")
 
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
@@ -228,7 +230,7 @@ class Exp_Informer(Exp_Basic):
         return self.model
 
     def test(self, setting):
-        test_data, test_loader = self._get_data(flag="test")
+        test_data, test_loader = get_data(self.args, flag="test")
 
         self.model.eval()
 
@@ -264,7 +266,7 @@ class Exp_Informer(Exp_Basic):
         return
 
     def predict(self, setting, load=False):
-        pred_data, pred_loader = self._get_data(flag="pred")
+        pred_data, pred_loader = get_data(self.args, flag="pred")
 
         if load:
             path = os.path.join(self.args.checkpoints, setting)

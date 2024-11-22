@@ -2,7 +2,6 @@ import torch
 from momentfm import MOMENTPipeline
 from momentfm.utils.masking import Masking #kengo - 追加
 
-import config
 import dataset
 from model.model import Model
 from propose import predict_distr

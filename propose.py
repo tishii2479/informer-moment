@@ -54,8 +54,8 @@ def predict_distr_by_sampling(
     model: Model,
     batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> torch.Tensor:
-    sample_size = 30 #30に変更
-    params = {"window_size": 30} #30に変更
+    sample_size = 30  # 30に変更
+    params = {"window_size": 30}  # 30に変更
     batch = generate_new_batch(
         batch=batch,
         sample_size=sample_size,
@@ -88,12 +88,15 @@ class ProposedModel(Model):
     提案モデル
     """
 
-    def __init__(self, moment_model: Model, informer_model: Model, input_size: int):
+    def __init__(self, moment_model: Model, informer_model: Model):
         self.moment_model = moment_model
         self.informer_model = informer_model
 
     def train(
-        self, train_dataset: torch.utils.data.Dataset, args: argparse.Namespace
+        self,
+        train_dataset: torch.utils.data.Dataset,
+        valid_dataset: torch.utils.data.Dataset,
+        args: argparse.Namespace,
     ) -> None:
         pass
 
@@ -106,10 +109,12 @@ class ProposedModel(Model):
         return y3
 
     def predict_distr(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        self,
+        index: int,
+        batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        y1 = self.moment_model.predict_distr(batch)
-        y2 = self.informer_model.predict_distr(batch)
+        y1 = self.moment_model.predict_distr(index, batch)
+        y2 = self.informer_model.predict_distr(index, batch)
         y3 = 0.5 * y1 + 0.5 * y2
         return y3
 
@@ -141,32 +146,45 @@ class ProposedModelWithMoe(Model):
         self.weight_model = SimpleNN(input_size, 1).float()
 
     def train(
-        self, train_dataset: torch.utils.data.Dataset, args: argparse.Namespace
+        self,
+        train_dataset: torch.utils.data.Dataset,
+        valid_dataset: torch.utils.data.Dataset,
+        args: argparse.Namespace,
     ) -> None:
-        # モデル、損失関数、オプティマイザーの定義
         train_dataloader = dataset.to_dataloader(train_dataset, args, "train")
+        valid_dataloader = dataset.to_dataloader(valid_dataset, args, "val")
 
-        criterion = nn.MSELoss()  # 二乗誤差損失関数に変更
+        criterion = nn.MSELoss()
         optimizer = optim.Adam(
-            self.weight_model.parameters(), lr=0.001
-        )  # オプティマイザー
-        num_epochs = 1  # エポック数
+            self.weight_model.parameters(), lr=1e-3, weight_decay=1e-2
+        )
+        num_epochs = 5
 
-        for epoch in range(num_epochs):
+        def run_epoch(dataloader: torch.utils.data.DataLoader, is_eval: bool) -> float:
             total_loss = 0.0
-            for batch in tqdm.tqdm(train_dataloader):
+            for index, batch in tqdm.tqdm(dataloader):
                 _, batch_y, _, _ = batch
                 labels = batch_y[:, -1].squeeze().float()
-                optimizer.zero_grad()  # 勾配の初期化
-                outputs = self.predict(batch)  # モデルの出力
-                loss = criterion(outputs, labels)  # 損失の計算
-                loss.backward()  # 勾配の計算
-                optimizer.step()  # パラメータの更新
+                optimizer.zero_grad()
+                outputs = self.predict_distr(index, batch)[:, 0]  # 平均のみ取り出す
+                loss = criterion(outputs, labels)
+
+                if not is_eval:
+                    loss.backward()
+                    optimizer.step()
 
                 total_loss += loss.item()
 
             total_loss /= len(train_dataloader)
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {total_loss:.4f}")
+            return total_loss
+
+        for epoch in range(num_epochs):
+            train_loss = run_epoch(train_dataloader, False)
+            valid_loss = run_epoch(valid_dataloader, True)
+            print(
+                f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}, "
+                f"Valid Loss: {valid_loss:.4f}"
+            )
 
     def predict(
         self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
@@ -179,11 +197,13 @@ class ProposedModelWithMoe(Model):
         return y3
 
     def predict_distr(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        self,
+        index: int,
+        batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         batch_x, _, _, _ = batch
-        y1 = self.moment_model.predict_distr(batch)
-        y2 = self.informer_model.predict_distr(batch)
+        y1 = self.moment_model.predict_distr(index, batch)
+        y2 = self.informer_model.predict_distr(index, batch)
         w = self.weight_model.forward(batch_x.squeeze().float())
         y3 = w * y1 + (1 - w) * y2
         return y3

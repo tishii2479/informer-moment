@@ -1,12 +1,14 @@
+import argparse
+
 import torch
 from momentfm import MOMENTPipeline
-from momentfm.utils.masking import Masking #kengo - 追加
+from momentfm.utils.masking import Masking  # kengo - 追加
+from tqdm import tqdm  # kengo - 追加
 
 import dataset
 from model.model import Model
 from propose import predict_distr
 
-from tqdm import tqdm #kengo - 追加
 
 class MomentModel(Model):
     T = 512
@@ -14,6 +16,7 @@ class MomentModel(Model):
     def __init__(self, param: str, pred_len: int) -> None:
         self.model = MomentModel.from_pretrained(param)
         self.pred_len = pred_len
+        self.y_pred = {}
 
     @classmethod
     def from_pretrained(
@@ -53,45 +56,69 @@ class MomentModel(Model):
         return pred
 
     def predict_distr(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        self,
+        index: int,
+        batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        return predict_distr(self, batch)
-    
-    def fine_tuning(self, test_dataloader, lr: float = 1e-4, mask_ratio: float = 0.3): # 追加
+        if index in self.y_pred:
+            return self.y_pred[index]
+
+        y = predict_distr(self, batch)
+        self.y_pred[index] = y.clone().detach()
+        return y
+
+    def fine_tuning(
+        self,
+        train_dataset: torch.utils.data.Dataset,
+        valid_dataset: torch.utils.data.Dataset,
+        args: argparse.Namespace,
+        lr: float = 1e-4,
+        mask_ratio: float = 0.3,
+    ):  # 追加
+        train_dataloader = dataset.to_dataloader(
+            train_dataset=train_dataset, args=args, flag="train"
+        )
+        # valid_dataloader = dataset.to_dataloader(
+        #     valid_dataset=valid_dataset, args=args, flag="val"
+        # )
+
         device = "cuda:1" if torch.cuda.is_available() else "cpu"
-        criterion = torch.nn.MSELoss() 
+        criterion = torch.nn.MSELoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
 
-        mask_generator = Masking(mask_ratio=mask_ratio) # Mask 30% of patches randomly
+        mask_generator = Masking(mask_ratio=mask_ratio)  # Mask 30% of patches randomly
 
-        for batch in tqdm(test_dataloader):
+        for _, batch in tqdm(train_dataloader):
             batch_x, batch_y, batch_masks, _ = batch
             labels = batch_y[:, -1].squeeze().float()
             n_channels = batch_x.shape[1]
-            
+
             # Reshape to [batch_size * n_channels, 1, window_size]
-            batch_x = batch_x.reshape((-1, 1, 512)) 
-            
+            batch_x = batch_x.reshape((-1, 1, 512))
+
             batch_masks = batch_masks.to(device).long()
             batch_masks = batch_masks.repeat_interleave(n_channels, axis=0)
-            
+
             # Randomly mask some patches of data
-            mask = mask_generator.generate_mask(
-                x=batch_x, input_mask=batch_masks).to(device).long()
+            mask = (
+                mask_generator.generate_mask(x=batch_x, input_mask=batch_masks)
+                .to(device)
+                .long()
+            )
 
             # Forward
-            output = self.model(x_enc=batch_x, input_mask=batch_masks, mask=mask) 
-            
+            output = self.model(x_enc=batch_x, input_mask=batch_masks, mask=mask)
+
             # Compute loss
             recon_loss = criterion(output.reconstruction, labels)
             observed_mask = batch_masks * (1 - mask)
             masked_loss = observed_mask * recon_loss
-            
+
             loss = masked_loss.nansum() / (observed_mask.nansum() + 1e-7)
-            
+
             print(f"loss: {loss.item()}")
-            
+
             # Backward
             optimizer.zero_grad()
             loss.backward()
-            optimizer.step() 
+            optimizer.step()

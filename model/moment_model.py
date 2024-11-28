@@ -15,6 +15,7 @@ class MomentModel(Model):
 
     def __init__(self, param: str, pred_len: int) -> None:
         self.model = MomentModel.from_pretrained(param)
+        self.model.eval()
         self.pred_len = pred_len
         self.y_pred = {}
 
@@ -57,14 +58,16 @@ class MomentModel(Model):
 
     def predict_distr(
         self,
-        index: int,
+        index: torch.Tensor,
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        if index in self.y_pred:
-            return self.y_pred[index]
+        index = [i.item() for i in index]
+        if sum([i not in self.y_pred for i in index]) == 0:
+            return torch.stack([self.y_pred[i] for i in index])
 
         y = predict_distr(self, batch)
-        self.y_pred[index] = y.clone().detach()
+        for i, _y in zip(index, y):
+            self.y_pred[i] = _y
         return y
 
     def fine_tuning(

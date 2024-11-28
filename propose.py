@@ -110,7 +110,7 @@ class ProposedModel(Model):
 
     def predict_distr(
         self,
-        index: int,
+        index: torch.Tensor,
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         y1 = self.moment_model.predict_distr(index, batch)
@@ -198,7 +198,7 @@ class ProposedModelWithMoe(Model):
 
     def predict_distr(
         self,
-        index: int,
+        index: torch.Tensor,
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         batch_x, _, _, _ = batch

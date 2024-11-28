@@ -43,6 +43,7 @@ class InformerModel(Model):
     ) -> None:
         self.model = load_default_informer(args)
         self.model.load_state_dict(torch.load(checkpoint_path), strict=False)
+        self.model.eval()
         self.args = args
         self.y_pred = {}
 
@@ -60,14 +61,16 @@ class InformerModel(Model):
 
     def predict_distr(
         self,
-        index: int,
+        index: torch.Tensor,
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        if index in self.y_pred:
-            return self.y_pred[index]
+        index = [i.item() for i in index]
+        if sum([i not in self.y_pred for i in index]) == 0:
+            return torch.stack([self.y_pred[i] for i in index])
 
         y = predict_distr(self, batch)
-        self.y_pred[index] = y.clone().detach()
+        for i, _y in zip(index, y):
+            self.y_pred[i] = _y
         return y
 
     def process_one_batch(

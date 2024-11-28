@@ -9,20 +9,30 @@ from Informer2020.exp.exp_informer import get_data
 def to_dataloader(
     dataset: torch.utils.data.Dataset, args: argparse.Namespace, flag: str
 ) -> torch.utils.data.DataLoader:
-    dataset = DatasetWithIndex(dataset=dataset)
-
     if flag == "test":
         shuffle_flag = False
         drop_last = True
         batch_size = args.batch_size
+        base_index = 0
     elif flag == "pred":
         shuffle_flag = False
         drop_last = False
         batch_size = 1
-    else:
-        shuffle_flag = True
+        base_index = 1_000_000_000
+    elif flag == "val":
+        shuffle_flag = False
         drop_last = True
         batch_size = args.batch_size
+        base_index = 2_000_000_000
+    elif flag == "train":
+        shuffle_flag = False
+        drop_last = True
+        batch_size = args.batch_size
+        base_index = 3_000_000_000
+    else:
+        assert False
+
+    dataset = DatasetWithIndex(dataset=dataset, base_index=base_index)
     data_loader = torch.utils.data.DataLoader(
         dataset,
         batch_size=batch_size,
@@ -54,11 +64,12 @@ def load_dataset(args: argparse.Namespace) -> tuple[
 
 
 class DatasetWithIndex(torch.utils.data.Dataset):
-    def __init__(self, dataset: torch.utils.data.Dataset) -> None:
+    def __init__(self, dataset: torch.utils.data.Dataset, base_index: int) -> None:
         self.dataset = dataset
+        self.base_index = base_index
 
     def __getitem__(self, index: int) -> tuple[int, Any]:
-        return (index, self.dataset[index])
+        return (self.base_index + index, self.dataset[index])
 
     def __len__(self) -> int:
         return len(self.dataset)  # type: ignore

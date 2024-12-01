@@ -4,8 +4,8 @@ from typing import Optional
 
 import torch
 from momentfm import MOMENTPipeline
-from momentfm.utils.masking import Masking  # kengo - 追加
-from tqdm import tqdm  # kengo - 追加
+from momentfm.utils.masking import Masking
+from tqdm import tqdm
 
 import dataset
 from model.model import Model

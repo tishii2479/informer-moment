@@ -49,19 +49,22 @@ class InformerModel(Model):
         path = get_checkpoint_path(args=args, setting=setting)
 
         try:
-            self.model = load_default_informer(args=args)
-            self.model.load_state_dict(torch.load(path))
-        except:  # noqa: E722
-            print("start training informer")
-            self.model = Exp_Informer(args=args).train(setting=setting)
-
-        self.model.eval()
-        self.args = args
-        try:
             with open(y_pred_path, "rb") as f:
                 self.y_pred = pickle.load(f)
         except:  # noqa: E722
             self.y_pred = {}
+
+        try:
+            self.model = load_default_informer(args=args)
+            if len(self.y_pred) == 0:
+                # y_predのデータがある場合は、学習済みのinformerがなくても良い
+                self.model.load_state_dict(torch.load(path))
+        except:  # noqa: E722
+            print("=" * 30 + "\nstart training informer\n" + "=" * 30)
+            self.model = Exp_Informer(args=args).train(setting=setting)
+
+        self.model.eval()
+        self.args = args
 
     def predict(
         self,

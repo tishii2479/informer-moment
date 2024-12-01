@@ -25,7 +25,7 @@ if True:  # noqa: E402
 
 
 def get_y_pred_path(method: str, data: str) -> str:
-    return "checkpoints/{method}_{data}_y_pred.pkl".format(method=method, data=data)
+    return "checkpoints/y_pred_{data}_{method}.pkl".format(method=method, data=data)
 
 
 def set_seed(seed: int) -> None:

@@ -21,10 +21,10 @@ class MomentModel(Model):
         self.model = MomentModel.from_pretrained(param)
         self.model.eval()
         self.pred_len = pred_len
-        if y_pred_path is not None:
+        try:
             with open(y_pred_path, "rb") as f:
                 self.y_pred = pickle.load(f)
-        else:
+        except:  # noqa: E722
             self.y_pred = {}
 
     @classmethod

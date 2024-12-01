@@ -43,24 +43,24 @@ class InformerModel(Model):
     def __init__(
         self,
         args: argparse.Namespace,
-        use_saved_model: bool = False,
         y_pred_path: Optional[str] = None,
     ) -> None:
         setting = to_setting_str(args=args, itr=0)
         path = get_checkpoint_path(args=args, setting=setting)
 
-        if not use_saved_model and y_pred_path is None:
-            self.model = Exp_Informer(args=args).train(setting=setting)
-        else:
+        try:
             self.model = load_default_informer(args=args)
             self.model.load_state_dict(torch.load(path))
+        except:  # noqa: E722
+            print("start training informer")
+            self.model = Exp_Informer(args=args).train(setting=setting)
 
         self.model.eval()
         self.args = args
-        if y_pred_path is not None:
+        try:
             with open(y_pred_path, "rb") as f:
                 self.y_pred = pickle.load(f)
-        else:
+        except:  # noqa: E722
             self.y_pred = {}
 
     def predict(

@@ -20,11 +20,13 @@ def to_dataloader(
         batch_size = 1
         base_index = 1_000_000_000
     elif flag == "val":
+        # y_predのcacheが効かなくなるので、シャッフルしていない、本当は良くない
         shuffle_flag = False
         drop_last = True
         batch_size = args.batch_size
         base_index = 2_000_000_000
     elif flag == "train":
+        # y_predのcacheが効かなくなるので、シャッフルしていない、本当は良くない
         shuffle_flag = False
         drop_last = True
         batch_size = args.batch_size

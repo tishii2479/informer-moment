@@ -23,7 +23,9 @@ if True:  # noqa: E402
     from model.moment_model import MomentModel
     from propose import ProposedModel, ProposedModelWithMoe
 
-Y_PRED_PATH_PLACEHOLDER = "checkpoints/{method}_{data}_y_pred.pkl"
+
+def get_y_pred_path(method: str, data: str) -> str:
+    return "checkpoints/{method}_{data}_y_pred.pkl".format(method=method, data=data)
 
 
 def set_seed(seed: int) -> None:
@@ -63,12 +65,9 @@ def load_moment_model_finetuned(
 
 def load_informer_model(
     args: argparse.Namespace,
-    use_saved_model: bool = False,
     y_pred_path: Optional[str] = None,
 ) -> InformerModel:
-    return InformerModel(
-        args=args, use_saved_model=use_saved_model, y_pred_path=y_pred_path
-    )
+    return InformerModel(args=args, y_pred_path=y_pred_path)
 
 
 def load_proposed_model(
@@ -108,28 +107,25 @@ def load_proposed_model_with_moe(
 
 
 def main() -> None:
-    args = parse_args()
-
     set_seed(0)
 
+    args = parse_args()
     print("args:", args)
 
     train_dataset, valid_dataset, test_dataset = dataset.load_dataset(args=args)
-    input_size = args.seq_len
 
     moment_model = load_moment_model(
         args=args,
         y_pred_path=(
-            Y_PRED_PATH_PLACEHOLDER.format(method="moment", data=args.data)
+            get_y_pred_path(method="moment", data=args.data)
             if args.use_y_pred_cache
             else None
         ),
     )
     informer_model = load_informer_model(
         args=args,
-        use_saved_model=False,
         y_pred_path=(
-            Y_PRED_PATH_PLACEHOLDER.format(method="informer", data=args.data)
+            get_y_pred_path(method="informer", data=args.data)
             if args.use_y_pred_cache
             else None
         ),
@@ -140,7 +136,7 @@ def main() -> None:
     proposed_model_with_moe = load_proposed_model_with_moe(
         moment_model,
         informer_model,
-        input_size,
+        args.seq_len,
         train_dataset,
         valid_dataset,
         args,
@@ -149,9 +145,7 @@ def main() -> None:
         epochs=args.proposed_moe_epochs,
     )
 
-    print("args:", args)
     results = {}
-
     for method, model in {
         "informer": informer_model,
         "moment": moment_model,
@@ -178,14 +172,9 @@ def main() -> None:
     df.to_csv(f"data/results_{args.data}.csv")
     print(df)
 
-    with open(
-        Y_PRED_PATH_PLACEHOLDER.format(method="informer", data=args.data), "wb"
-    ) as f:
+    with open(get_y_pred_path(method="informer", data=args.data), "wb") as f:
         pickle.dump(informer_model.y_pred, f)
-
-    with open(
-        Y_PRED_PATH_PLACEHOLDER.format(method="moment", data=args.data), "wb"
-    ) as f:
+    with open(get_y_pred_path(method="moment", data=args.data), "wb") as f:
         pickle.dump(moment_model.y_pred, f)
 
 

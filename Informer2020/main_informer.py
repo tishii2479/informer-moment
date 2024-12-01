@@ -158,6 +158,35 @@ def parse_args(arg_str: Optional[str] = None) -> argparse.Namespace:
         "--devices", type=str, default="0,1,2,3", help="device ids of multile gpus"
     )
 
+    # 追加分
+    parser.add_argument(
+        "--use_saved_informer",
+        action="store_true",
+        help="use saved informer",
+        default=False,
+    )
+    parser.add_argument(
+        "--use_y_pred_cache",
+        action="store_true",
+        help="use y_pred cache for informer and moment",
+        default=False,
+    )
+    parser.add_argument(
+        "--proposed_lmda", type=float, default=0.5, help="proposed lambda"
+    )
+    parser.add_argument(
+        "--proposed_moe_lr", type=float, default=1e-2, help="proposed+moe learning rate"
+    )
+    parser.add_argument(
+        "--proposed_moe_weight_decay",
+        type=float,
+        default=1e-2,
+        help="proposed+moe weight-decay",
+    )
+    parser.add_argument(
+        "--proposed_moe_epochs", type=int, default=10, help="proposed+moe epochs"
+    )
+
     if arg_str is None:
         args = parser.parse_args()
     else:
@@ -245,6 +274,30 @@ def parse_args(arg_str: Optional[str] = None) -> argparse.Namespace:
     return args
 
 
+def to_setting_str(args: argparse.Namespace, itr: int) -> str:
+    s = "{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_mx{}_{}_{}".format(
+        args.model,
+        args.data,
+        args.features,
+        args.seq_len,
+        args.label_len,
+        args.pred_len,
+        args.d_model,
+        args.n_heads,
+        args.e_layers,
+        args.d_layers,
+        args.d_ff,
+        args.attn,
+        args.factor,
+        args.embed,
+        args.distil,
+        args.mix,
+        args.des,
+        itr,
+    )
+    return s
+
+
 if __name__ == "__main__":
     args = parse_args()
 
@@ -255,26 +308,7 @@ if __name__ == "__main__":
 
     for ii in range(args.itr):
         # setting record of experiments
-        setting = "{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_mx{}_{}_{}".format(
-            args.model,
-            args.data,
-            args.features,
-            args.seq_len,
-            args.label_len,
-            args.pred_len,
-            args.d_model,
-            args.n_heads,
-            args.e_layers,
-            args.d_layers,
-            args.d_ff,
-            args.attn,
-            args.factor,
-            args.embed,
-            args.distil,
-            args.mix,
-            args.des,
-            ii,
-        )
+        setting = to_setting_str(args=args, itr=ii)
 
         exp = Exp(args)  # set experiments
         print(">>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>".format(setting))

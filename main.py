@@ -1,22 +1,29 @@
 import sys
-sys.path.append("Informer2020") # workaround
 
-import argparse
-import random
-import tqdm
-import numpy as np
-import torch
-import pandas as pd
-import os
+sys.path.append("Informer2020")
 
-import dataset
-from model.informer_model import InformerModel
-from model.model import Model
-from model.moment_model import MomentModel
-from propose import ProposedModelWithMoe
-from evaluation import evaluate_mse, evaluate_nll
+# Informer2020をimportするためのwork-around
+# 本来は https://qiita.com/siida36/items/b171922546e65b868679 などに従うべき
+if True:  # noqa: E402
+    import argparse
+    import pickle
+    import random
+    from typing import Optional
 
-from main_informer import parse_args
+    import numpy as np
+    import pandas as pd
+    import torch
+    import tqdm
+
+    import dataset
+    from evaluation import evaluate_mse, evaluate_nll
+    from Informer2020.main_informer import parse_args
+    from model.informer_model import InformerModel
+    from model.model import Model
+    from model.moment_model import MomentModel
+    from propose import ProposedModel, ProposedModelWithMoe
+
+Y_PRED_PATH_PLACEHOLDER = "checkpoints/{method}_{data}_y_pred.pkl"
 
 
 def set_seed(seed: int) -> None:
@@ -33,37 +40,115 @@ def set_seed(seed: int) -> None:
     torch.backends.cudnn.deterministic = True
 
 
-def load_moment_model(args: argparse.Namespace) -> Model:
-    return MomentModel(param="AutonLab/MOMENT-1-large", pred_len=args.pred_len)
+def load_moment_model(
+    args: argparse.Namespace, y_pred_path: Optional[str] = None
+) -> MomentModel:
+    return MomentModel(
+        param="AutonLab/MOMENT-1-large", pred_len=args.pred_len, y_pred_path=y_pred_path
+    )
 
 
-def load_informer_model(args: argparse.Namespace) -> Model:
-    return InformerModel(args, checkpoint_path=INFORMER_CKPT_PATH)
-
-
-def load_proposed_model(moment_model: Model, informer_model: Model,input_size: int,train_dataset: torch.utils.data.Dataset, args: argparse.Namespace) -> Model:
-    model = ProposedModelWithMoe(moment_model=moment_model, informer_model=informer_model,input_size=input_size)
-    model.train(train_dataset=train_dataset,args=args)
+def load_moment_model_finetuned(
+    args: argparse.Namespace,
+    train_dataset: torch.utils.data.Dataset,
+    valid_dataset: torch.utils.data.Dataset,
+    y_pred_path: Optional[str] = None,
+) -> MomentModel:
+    model = load_moment_model(args=args, y_pred_path=y_pred_path)
+    model.fine_tuning(
+        train_dataset=train_dataset, valid_dataset=valid_dataset, args=args
+    )
     return model
 
 
-def main():
+def load_informer_model(
+    args: argparse.Namespace,
+    use_saved_model: bool = False,
+    y_pred_path: Optional[str] = None,
+) -> InformerModel:
+    return InformerModel(
+        args=args, use_saved_model=use_saved_model, y_pred_path=y_pred_path
+    )
+
+
+def load_proposed_model(
+    moment_model: Model, informer_model: Model, lmda: float
+) -> ProposedModel:
+    model = ProposedModel(
+        moment_model=moment_model, informer_model=informer_model, lmda=lmda
+    )
+    return model
+
+
+def load_proposed_model_with_moe(
+    moment_model: Model,
+    informer_model: Model,
+    input_size: int,
+    train_dataset: torch.utils.data.Dataset,
+    valid_dataset: torch.utils.data.Dataset,
+    args: argparse.Namespace,
+    lr: float,
+    weight_decay: float,
+    epochs: int,
+) -> ProposedModelWithMoe:
+    model = ProposedModelWithMoe(
+        moment_model=moment_model,
+        informer_model=informer_model,
+        input_size=input_size,
+    )
+    model.train(
+        train_dataset=train_dataset,
+        valid_dataset=valid_dataset,
+        args=args,
+        lr=lr,
+        weight_decay=weight_decay,
+        epochs=epochs,
+    )
+    return model
+
+
+def main() -> None:
+    args = parse_args()
+
     set_seed(0)
 
-    args = parse_args(ARG_STR)
-    save_file_name = args.checkpoints
-    if not os.path.exists(save_file_name):
-        os.mkdir(save_file_name)
     print("args:", args)
 
-    train_dataset, test_dataset = dataset.load_dataset(args=args)
+    train_dataset, valid_dataset, test_dataset = dataset.load_dataset(args=args)
     input_size = args.seq_len
-    moment_model = load_moment_model(args=args)
-    informer_model = load_informer_model(args=args)
 
-    proposed_model = load_proposed_model(moment_model, informer_model, input_size, train_dataset, args)
+    moment_model = load_moment_model(
+        args=args,
+        y_pred_path=(
+            Y_PRED_PATH_PLACEHOLDER.format(method="moment", data=args.data)
+            if args.use_y_pred_cache
+            else None
+        ),
+    )
+    informer_model = load_informer_model(
+        args=args,
+        use_saved_model=False,
+        y_pred_path=(
+            Y_PRED_PATH_PLACEHOLDER.format(method="informer", data=args.data)
+            if args.use_y_pred_cache
+            else None
+        ),
+    )
+    proposed_model = load_proposed_model(
+        moment_model, informer_model, lmda=args.proposed_lmda
+    )
+    proposed_model_with_moe = load_proposed_model_with_moe(
+        moment_model,
+        informer_model,
+        input_size,
+        train_dataset,
+        valid_dataset,
+        args,
+        lr=args.proposed_moe_lr,
+        weight_decay=args.proposed_moe_weight_decay,
+        epochs=args.proposed_moe_epochs,
+    )
 
-    # 予測結果の評価
     print("args:", args)
     results = {}
 
@@ -71,14 +156,15 @@ def main():
         "informer": informer_model,
         "moment": moment_model,
         "proposed": proposed_model,
+        "proposed+moe": proposed_model_with_moe,
     }.items():
         print(f"testing: {method}")
         test_dataloader = dataset.to_dataloader(test_dataset, args, "test")
 
         y_pred = []
         y_true = []
-        for batch in tqdm.tqdm(test_dataloader):
-            y_pred.append(model.predict_distr(batch).detach().tolist())
+        for index, batch in tqdm.tqdm(test_dataloader):
+            y_pred.append(model.predict_distr(index, batch).detach().tolist())
             y_true.append(batch[1][:, -1].squeeze().detach().tolist())
 
         y_pred, y_true = np.array(y_pred).reshape(-1, 2), np.array(y_true).flatten()
@@ -88,10 +174,19 @@ def main():
         }
         print(results[method])
 
-        np.save(f"checkpoints/y_pred_{method}.npy", y_pred)
+    df = pd.DataFrame(results)
+    df.to_csv(f"data/results_{args.data}.csv")
+    print(df)
 
-    print(results)
-    pd.DataFrame(results).to_csv("results.csv", index=False)
+    with open(
+        Y_PRED_PATH_PLACEHOLDER.format(method="informer", data=args.data), "wb"
+    ) as f:
+        pickle.dump(informer_model.y_pred, f)
+
+    with open(
+        Y_PRED_PATH_PLACEHOLDER.format(method="moment", data=args.data), "wb"
+    ) as f:
+        pickle.dump(moment_model.y_pred, f)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 # type: ignore
 
+import argparse
 import os
 import time
 import warnings
@@ -77,6 +78,10 @@ def get_data(args, flag):
     )
 
     return data_set, data_loader
+
+
+def get_checkpoint_path(args: argparse.Namespace, setting: str) -> str:
+    return os.path.join(args.checkpoints, setting) + "/checkpoint.pth"
 
 
 class Exp_Informer(Exp_Basic):
@@ -224,7 +229,7 @@ class Exp_Informer(Exp_Basic):
 
             adjust_learning_rate(model_optim, epoch + 1, self.args)
 
-        best_model_path = path + "/" + "checkpoint.pth"
+        best_model_path = get_checkpoint_path(args=self.args, setting=setting)
         self.model.load_state_dict(torch.load(best_model_path))
 
         return self.model

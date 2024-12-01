@@ -25,22 +25,9 @@ git push origin main
 ## 実験手順
 
 ```
-# 1. Informerモデルの準備
-
-cd Informer2020
-# コマンドを実行して、Informerの学習をする
-# Informerの学習パラメータはここで設定する
 # ETTh1
-python -u main_informer.py --model informer --data ETTh1 --attn prob --freq h --features S
-# NaturalGas
-python -u main_informer.py --model informer --data NaturalGas --root_path ./data/NaturalGas/ --attn prob --freq h --features S
+python main.py --model informer --data ETTh1 --attn prob --freq h --features S  --e_layers 1 --d_layers 1 --dropout 0.3 --learning_rate 0.0001 --embed timeF --use_y_pred_cache --proposed_lmda 0.5 --proposed_moe_lr=0.1 --proposed_moe_weight_decay=0.01 --proposed_moe_epochs=20
 
-cd ..
-
-mkdir checkpoints
-mv Informer2020/checkpoints/{学習済みモデルのファイル} checkpoints/{学習済みモデルのファイル}
-
-# 2. main.ipynbの実行
-
-一番上のセルの中身を適切に設定してから実行する
+# Natural Gas
+python main.py --model informer --data NaturalGas --root_path './Informer2020/data/NaturalGas/' --data_path combined_data.csv --features S --attn prob --freq h --e_layers 1 --d_layers 1 --dropout 0.3 --learning_rate 0.0001 --embed timeF --use_y_pred_cache --proposed_lmda 0.4 --proposed_moe_lr=0.01 --proposed_moe_weight_decay=0.01 --proposed_moe_epochs=20
 ```

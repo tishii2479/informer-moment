@@ -1,7 +1,11 @@
 import argparse
+import pickle
+from typing import Optional
 
 import torch
 
+from Informer2020.exp.exp_informer import Exp_Informer, get_checkpoint_path
+from Informer2020.main_informer import to_setting_str
 from Informer2020.models.model import Informer
 from model.model import Model
 from propose import predict_distr
@@ -39,25 +43,35 @@ class InformerModel(Model):
     def __init__(
         self,
         args: argparse.Namespace,
-        checkpoint_path: str,
+        use_saved_model: bool = False,
+        y_pred_path: Optional[str] = None,
     ) -> None:
-        self.model = load_default_informer(args)
-        self.model.load_state_dict(torch.load(checkpoint_path), strict=False)
+        setting = to_setting_str(args=args, itr=0)
+        path = get_checkpoint_path(args=args, setting=setting)
+
+        if not use_saved_model and y_pred_path is None:
+            self.model = Exp_Informer(args=args).train(setting=setting)
+        else:
+            self.model = load_default_informer(args=args)
+            self.model.load_state_dict(torch.load(path))
+
         self.model.eval()
         self.args = args
-        self.y_pred = {}
+        if y_pred_path is not None:
+            with open(y_pred_path, "rb") as f:
+                self.y_pred = pickle.load(f)
+        else:
+            self.y_pred = {}
 
     def predict(
         self,
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        self.model.eval()
-
         (batch_x, batch_y, batch_x_mark, batch_y_mark) = batch
         preds, _ = self.process_one_batch(batch_x, batch_y, batch_x_mark, batch_y_mark)
         preds = preds.squeeze()[:, -1]  # 最終時刻の予測のみ使用する
 
-        return preds
+        return preds.detach().clone()
 
     def predict_distr(
         self,

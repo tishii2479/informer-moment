@@ -54,7 +54,7 @@ def predict_distr_by_sampling(
     model: Model,
     batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
 ) -> torch.Tensor:
-    sample_size = 30  # 30に変更
+    sample_size = 5  # 10に変更
     params = {"window_size": 30}  # 30に変更
     batch = generate_new_batch(
         batch=batch,
@@ -88,9 +88,10 @@ class ProposedModel(Model):
     提案モデル
     """
 
-    def __init__(self, moment_model: Model, informer_model: Model):
+    def __init__(self, moment_model: Model, informer_model: Model, lmda: float):
         self.moment_model = moment_model
         self.informer_model = informer_model
+        self.lmda = lmda
 
     def train(
         self,
@@ -105,7 +106,7 @@ class ProposedModel(Model):
     ) -> torch.Tensor:
         y1 = self.moment_model.predict(batch)
         y2 = self.informer_model.predict(batch)
-        y3 = 0.5 * y1 + 0.5 * y2
+        y3 = self.lmda * y1 + (1 - self.lmda) * y2
         return y3
 
     def predict_distr(
@@ -115,7 +116,7 @@ class ProposedModel(Model):
     ) -> torch.Tensor:
         y1 = self.moment_model.predict_distr(index, batch)
         y2 = self.informer_model.predict_distr(index, batch)
-        y3 = 0.5 * y1 + 0.5 * y2
+        y3 = self.lmda * y1 + (1 - self.lmda) * y2
         return y3
 
 
@@ -123,9 +124,9 @@ class ProposedModel(Model):
 class SimpleNN(torch.nn.Module):
     def __init__(self, input_size: int, output_size: int) -> None:
         super(SimpleNN, self).__init__()
-        self.fc1 = torch.nn.Linear(input_size, 128)  # 入力層から隠れ層
-        self.fc2 = torch.nn.Linear(128, 64)  # 隠れ層から隠れ層
-        self.fc3 = torch.nn.Linear(64, output_size)  # 隠れ層から出力層
+        self.fc1 = torch.nn.Linear(input_size, 64)  # 入力層から隠れ層
+        self.fc2 = torch.nn.Linear(64, 32)  # 隠れ層から隠れ層
+        self.fc3 = torch.nn.Linear(32, output_size)  # 隠れ層から出力層
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         h1 = torch.relu(self.fc1(x))  # ReLU活性化関数
@@ -150,15 +151,17 @@ class ProposedModelWithMoe(Model):
         train_dataset: torch.utils.data.Dataset,
         valid_dataset: torch.utils.data.Dataset,
         args: argparse.Namespace,
+        lr: float,
+        weight_decay: float,
+        epochs: int,
     ) -> None:
         train_dataloader = dataset.to_dataloader(train_dataset, args, "train")
         valid_dataloader = dataset.to_dataloader(valid_dataset, args, "val")
 
         criterion = nn.MSELoss()
         optimizer = optim.Adam(
-            self.weight_model.parameters(), lr=1e-3, weight_decay=1e-2
+            self.weight_model.parameters(), lr=lr, weight_decay=weight_decay
         )
-        num_epochs = 5
 
         def run_epoch(dataloader: torch.utils.data.DataLoader, is_eval: bool) -> float:
             total_loss = 0.0
@@ -175,14 +178,16 @@ class ProposedModelWithMoe(Model):
 
                 total_loss += loss.item()
 
-            total_loss /= len(train_dataloader)
+            total_loss /= len(dataloader)
             return total_loss
 
-        for epoch in range(num_epochs):
+        for epoch in range(epochs):
+            self.weight_model.train()
             train_loss = run_epoch(train_dataloader, False)
+            self.weight_model.eval()
             valid_loss = run_epoch(valid_dataloader, True)
             print(
-                f"Epoch [{epoch+1}/{num_epochs}], Train Loss: {train_loss:.4f}, "
+                f"Epoch [{epoch+1}/{epochs}], Train Loss: {train_loss:.4f}, "
                 f"Valid Loss: {valid_loss:.4f}"
             )
 

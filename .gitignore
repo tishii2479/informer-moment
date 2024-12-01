@@ -6,3 +6,4 @@ checkpoints
 .DS_Store
 
 .ssh
+data/results_*.csv

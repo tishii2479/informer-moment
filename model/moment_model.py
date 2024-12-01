@@ -1,4 +1,6 @@
 import argparse
+import pickle
+from typing import Optional
 
 import torch
 from momentfm import MOMENTPipeline
@@ -13,11 +15,17 @@ from propose import predict_distr
 class MomentModel(Model):
     T = 512
 
-    def __init__(self, param: str, pred_len: int) -> None:
+    def __init__(
+        self, param: str, pred_len: int, y_pred_path: Optional[str] = None
+    ) -> None:
         self.model = MomentModel.from_pretrained(param)
         self.model.eval()
         self.pred_len = pred_len
-        self.y_pred = {}
+        if y_pred_path is not None:
+            with open(y_pred_path, "rb") as f:
+                self.y_pred = pickle.load(f)
+        else:
+            self.y_pred = {}
 
     @classmethod
     def from_pretrained(
@@ -54,7 +62,7 @@ class MomentModel(Model):
         pred = output.reconstruction.squeeze()[
             :, x_enc.shape[1] + self.pred_len - 1
         ]  # 最終時刻からpred_len先の結果を使用する
-        return pred
+        return pred.detach().clone()
 
     def predict_distr(
         self,
@@ -93,24 +101,29 @@ class MomentModel(Model):
 
         for _, batch in tqdm(train_dataloader):
             batch_x, batch_y, batch_masks, _ = batch
+            seq_len = batch_x.shape[1]
+            x_enc = torch.cat(
+                (
+                    batch_x,
+                    torch.zeros((batch_x.shape[0], self.T - seq_len, batch_x.shape[2])),
+                ),
+                dim=1,
+            ).permute(0, 2, 1)
             labels = batch_y[:, -1].squeeze().float()
             n_channels = batch_x.shape[1]
-
-            # Reshape to [batch_size * n_channels, 1, window_size]
-            batch_x = batch_x.reshape((-1, 1, 512))
 
             batch_masks = batch_masks.to(device).long()
             batch_masks = batch_masks.repeat_interleave(n_channels, axis=0)
 
             # Randomly mask some patches of data
             mask = (
-                mask_generator.generate_mask(x=batch_x, input_mask=batch_masks)
+                mask_generator.generate_mask(x=x_enc, input_mask=batch_masks)
                 .to(device)
                 .long()
             )
 
             # Forward
-            output = self.model(x_enc=batch_x, input_mask=batch_masks, mask=mask)
+            output = self.model(x_enc=x_enc, input_mask=batch_masks, mask=mask)
 
             # Compute loss
             recon_loss = criterion(output.reconstruction, labels)

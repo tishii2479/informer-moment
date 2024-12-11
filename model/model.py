@@ -1,4 +1,5 @@
 import abc
+from typing import Optional
 
 import torch
 
@@ -7,6 +8,7 @@ class Model(abc.ABC):
     @abc.abstractmethod
     def predict(
         self,
+        index: Optional[torch.Tensor],
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         """
@@ -21,7 +23,7 @@ class Model(abc.ABC):
     @abc.abstractmethod
     def predict_distr(
         self,
-        index: torch.Tensor,
+        index: Optional[torch.Tensor],
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         """
@@ -41,6 +43,7 @@ class MockModel(Model):
 
     def predict(
         self,
+        index: Optional[torch.Tensor],
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         # 入力によらず0を予測値として返す
@@ -49,7 +52,7 @@ class MockModel(Model):
 
     def predict_distr(
         self,
-        index: torch.Tensor,
+        index: Optional[torch.Tensor],
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         # 入力によらず、[0, 1]を予測値として返す

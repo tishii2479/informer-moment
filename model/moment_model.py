@@ -42,8 +42,17 @@ class MomentModel(Model):
         return model
 
     def predict(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        self,
+        index: Optional[torch.Tensor],
+        batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
+        if index is not None:
+            index = [
+                -(1 + i.item()) for i in index
+            ]  # predictはキャッシュのキーに負のindexを使う、だいぶ良くない
+            if sum([i not in self.y_pred for i in index]) == 0:
+                return torch.stack([self.y_pred[i] for i in index])
+
         batch_x, _, _, _ = batch
         seq_len = batch_x.shape[1]
         x_enc = torch.cat(
@@ -62,20 +71,27 @@ class MomentModel(Model):
         pred = output.reconstruction.squeeze()[
             :, x_enc.shape[1] + self.pred_len - 1
         ]  # 最終時刻からpred_len先の結果を使用する
-        return pred.detach().clone()
+        y = pred.detach().clone()
+
+        if index is not None:
+            for i, _y in zip(index, y):
+                self.y_pred[i] = _y
+        return y
 
     def predict_distr(
         self,
-        index: torch.Tensor,
+        index: Optional[torch.Tensor],
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        index = [i.item() for i in index]
-        if sum([i not in self.y_pred for i in index]) == 0:
-            return torch.stack([self.y_pred[i] for i in index])
+        if index is not None:
+            index = [i.item() for i in index]
+            if sum([i not in self.y_pred for i in index]) == 0:
+                return torch.stack([self.y_pred[i] for i in index])
 
         y = predict_distr(self, batch)
-        for i, _y in zip(index, y):
-            self.y_pred[i] = _y
+        if index is not None:
+            for i, _y in zip(index, y):
+                self.y_pred[i] = _y
         return y
 
     def fine_tuning(

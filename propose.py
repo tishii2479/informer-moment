@@ -1,5 +1,5 @@
 import argparse
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 import torch
@@ -62,7 +62,10 @@ def predict_distr_by_sampling(
         generate_new_x=generate_new_x,
         params=params,
     )
-    pred = model.predict(batch)
+    pred = model.predict(
+        None,
+        batch,
+    )
 
     m = torch.mean(input=pred.reshape(-1, sample_size), dim=1)
     s = torch.std(input=pred.reshape(-1, sample_size), dim=1)
@@ -102,20 +105,22 @@ class ProposedModel(Model):
         pass
 
     def predict(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        self,
+        index: Optional[torch.Tensor],
+        batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        y1 = self.moment_model.predict(batch)
-        y2 = self.informer_model.predict(batch)
+        y1 = self.moment_model.predict(index=index, batch=batch)
+        y2 = self.informer_model.predict(index=index, batch=batch)
         y3 = self.lmda * y1 + (1 - self.lmda) * y2
         return y3
 
     def predict_distr(
         self,
-        index: torch.Tensor,
+        index: Optional[torch.Tensor],
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        y1 = self.moment_model.predict_distr(index, batch)
-        y2 = self.informer_model.predict_distr(index, batch)
+        y1 = self.moment_model.predict_distr(index=index, batch=batch)
+        y2 = self.informer_model.predict_distr(index=index, batch=batch)
         y3 = self.lmda * y1 + (1 - self.lmda) * y2
         return y3
 
@@ -192,23 +197,25 @@ class ProposedModelWithMoe(Model):
             )
 
     def predict(
-        self, batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]
+        self,
+        index: Optional[torch.Tensor],
+        batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         batch_x, _, _, _ = batch
-        y1 = self.moment_model.predict(batch)
-        y2 = self.informer_model.predict(batch)
+        y1 = self.moment_model.predict(index=index, batch=batch)
+        y2 = self.informer_model.predict(index=index, batch=batch)
         w = self.weight_model.forward(batch_x.squeeze().float())
         y3 = w * y1 + (1 - w) * y2
         return y3
 
     def predict_distr(
         self,
-        index: torch.Tensor,
+        index: Optional[torch.Tensor],
         batch: tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         batch_x, _, _, _ = batch
-        y1 = self.moment_model.predict_distr(index, batch)
-        y2 = self.informer_model.predict_distr(index, batch)
+        y1 = self.moment_model.predict_distr(index=index, batch=batch)
+        y2 = self.informer_model.predict_distr(index=index, batch=batch)
         w = self.weight_model.forward(batch_x.squeeze().float())
         y3 = w * y1 + (1 - w) * y2
         return y3

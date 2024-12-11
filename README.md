@@ -26,8 +26,8 @@ git push origin main
 
 ```
 # ETTh1
-python main.py --model informer --data ETTh1 --root_path './Informer2020/data/ETT/' --attn prob --freq h --features S  --e_layers 1 --d_layers 1 --dropout 0.3 --learning_rate 0.0001 --embed timeF --use_y_pred_cache --proposed_lmda 0.5 --proposed_moe_lr=0.1 --proposed_moe_weight_decay=0.01 --proposed_moe_epochs=20
+python main.py --model informer --data ETTh1 --root_path './Informer2020/data/ETT/' --attn prob --freq h --features S  --e_layers 1 --d_layers 1 --dropout 0.3 --learning_rate 0.0001 --embed timeF --use_y_pred_cache --proposed_lmda 0.5 --proposed_moe_lr=0.1 --proposed_moe_weight_decay=10 --proposed_moe_epochs=10
 
 # Natural Gas
-python main.py --model informer --data NaturalGas --root_path './Informer2020/data/NaturalGas/' --data_path combined_data.csv --features S --attn prob --freq h --e_layers 1 --d_layers 1 --dropout 0.3 --learning_rate 0.0001 --embed timeF --use_y_pred_cache --proposed_lmda 0.4 --proposed_moe_lr=0.01 --proposed_moe_weight_decay=0.01 --proposed_moe_epochs=20
+python main.py --model informer --data NaturalGas --root_path './Informer2020/data/NaturalGas/' --data_path combined_data.csv --features S --attn prob --freq h --e_layers 1 --d_layers 1 --dropout 0.3 --learning_rate 0.0001 --embed timeF --use_y_pred_cache --proposed_lmda 0.5 --proposed_moe_lr=0.1 --proposed_moe_weight_decay=0.1 --proposed_moe_epochs=20
 ```

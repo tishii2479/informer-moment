@@ -129,14 +129,16 @@ class ProposedModel(Model):
 class SimpleNN(torch.nn.Module):
     def __init__(self, input_size: int, output_size: int) -> None:
         super(SimpleNN, self).__init__()
-        self.fc1 = torch.nn.Linear(input_size, 64)  # 入力層から隠れ層
-        self.fc2 = torch.nn.Linear(64, 32)  # 隠れ層から隠れ層
-        self.fc3 = torch.nn.Linear(32, output_size)  # 隠れ層から出力層
+        self.fc1 = torch.nn.Linear(input_size, 32)  # 入力層から隠れ層
+        self.fc2 = torch.nn.Linear(32, 64)  # 隠れ層から隠れ層
+        self.fc3 = torch.nn.Linear(64, 32)  # 隠れ層から隠れ層
+        self.fc4 = torch.nn.Linear(32, output_size)  # 隠れ層から出力層
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         h1 = torch.relu(self.fc1(x))  # ReLU活性化関数
         h2 = torch.relu(self.fc2(h1))
-        y = torch.sigmoid(self.fc3(h2))  # 出力層
+        h3 = torch.relu(self.fc3(h2))
+        y = torch.sigmoid(self.fc4(h3))  # 出力層
         return y
 
 
@@ -163,7 +165,7 @@ class ProposedModelWithMoe(Model):
         train_dataloader = dataset.to_dataloader(train_dataset, args, "train")
         valid_dataloader = dataset.to_dataloader(valid_dataset, args, "val")
 
-        criterion = nn.MSELoss()
+        criterion = nn.GaussianNLLLoss()
         optimizer = optim.Adam(
             self.weight_model.parameters(), lr=lr, weight_decay=weight_decay
         )
@@ -174,8 +176,10 @@ class ProposedModelWithMoe(Model):
                 _, batch_y, _, _ = batch
                 labels = batch_y[:, -1].squeeze().float()
                 optimizer.zero_grad()
-                outputs = self.predict_distr(index, batch)[:, 0]  # 平均のみ取り出す
-                loss = criterion(outputs, labels)
+                outputs = self.predict_distr(index, batch)
+                mu = outputs[:, 0]
+                sigma = outputs[:, 1]
+                loss = criterion(mu, labels, sigma)
 
                 if not is_eval:
                     loss.backward()

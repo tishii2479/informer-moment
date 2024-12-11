@@ -10,22 +10,33 @@ from tqdm import tqdm
 import dataset
 from model.model import Model
 from propose import predict_distr
+from util import calc_sigma
 
 
 class MomentModel(Model):
     T = 512
 
     def __init__(
-        self, param: str, pred_len: int, y_pred_path: Optional[str] = None
+        self,
+        param: str,
+        valid_dataset: torch.utils.data.Dataset,
+        args: argparse.Namespace,
+        y_pred_path: Optional[str] = None,
     ) -> None:
         self.model = MomentModel.from_pretrained(param)
         self.model.eval()
-        self.pred_len = pred_len
+        self.pred_len = args.pred_len
         try:
             with open(y_pred_path, "rb") as f:
                 self.y_pred = pickle.load(f)
         except:  # noqa: E722
             self.y_pred = {}
+
+        valid_dataloader = dataset.to_dataloader(
+            dataset=valid_dataset, args=args, flag="val"
+        )
+        self.sigma = calc_sigma(data_loader=valid_dataloader, model=self)
+        print(f"sigma for moment: {self.sigma}")
 
     @classmethod
     def from_pretrained(
@@ -89,6 +100,8 @@ class MomentModel(Model):
                 return torch.stack([self.y_pred[i] for i in index])
 
         y = predict_distr(self, batch)
+        y[:, 1] += self.sigma
+
         if index is not None:
             for i, _y in zip(index, y):
                 self.y_pred[i] = _y

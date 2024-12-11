@@ -68,7 +68,7 @@ def predict_distr_by_sampling(
     )
 
     m = torch.mean(input=pred.reshape(-1, sample_size), dim=1)
-    s = torch.std(input=pred.reshape(-1, sample_size), dim=1)
+    s = torch.var(input=pred.reshape(-1, sample_size), dim=1)
     return torch.stack((m, s), dim=1)
 
 

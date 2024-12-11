@@ -32,7 +32,7 @@ def evaluate_nll(y_pred: np.ndarray, y_test: np.ndarray) -> float:
 
     NLL = 0
     for i in range(len(y_pred)):
-        NLL -= norm.logpdf(y_test[i], loc=y_pred[i][0], scale=y_pred[i][1])
+        NLL -= norm.logpdf(y_test[i], loc=y_pred[i][0], scale=np.sqrt(y_pred[i][1]))
     NLL = NLL / len(y_pred)
     return NLL
 

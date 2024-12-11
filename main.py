@@ -43,10 +43,15 @@ def set_seed(seed: int) -> None:
 
 
 def load_moment_model(
-    args: argparse.Namespace, y_pred_path: Optional[str] = None
+    args: argparse.Namespace,
+    valid_dataset: torch.utils.data.Dataset,
+    y_pred_path: Optional[str] = None,
 ) -> MomentModel:
     return MomentModel(
-        param="AutonLab/MOMENT-1-large", pred_len=args.pred_len, y_pred_path=y_pred_path
+        param="AutonLab/MOMENT-1-large",
+        args=args,
+        valid_dataset=valid_dataset,
+        y_pred_path=y_pred_path,
     )
 
 
@@ -56,7 +61,9 @@ def load_moment_model_finetuned(
     valid_dataset: torch.utils.data.Dataset,
     y_pred_path: Optional[str] = None,
 ) -> MomentModel:
-    model = load_moment_model(args=args, y_pred_path=y_pred_path)
+    model = load_moment_model(
+        args=args, valid_dataset=valid_dataset, y_pred_path=y_pred_path
+    )
     model.fine_tuning(
         train_dataset=train_dataset, valid_dataset=valid_dataset, args=args
     )
@@ -65,9 +72,12 @@ def load_moment_model_finetuned(
 
 def load_informer_model(
     args: argparse.Namespace,
+    valid_dataset: torch.utils.data.Dataset,
     y_pred_path: Optional[str] = None,
 ) -> InformerModel:
-    return InformerModel(args=args, y_pred_path=y_pred_path)
+    return InformerModel(
+        args=args, valid_dataset=valid_dataset, y_pred_path=y_pred_path
+    )
 
 
 def load_proposed_model(
@@ -116,6 +126,7 @@ def main() -> None:
 
     moment_model = load_moment_model(
         args=args,
+        valid_dataset=valid_dataset,
         y_pred_path=(
             get_y_pred_path(method="moment", data=args.data)
             if args.use_y_pred_cache
@@ -124,6 +135,7 @@ def main() -> None:
     )
     informer_model = load_informer_model(
         args=args,
+        valid_dataset=valid_dataset,
         y_pred_path=(
             get_y_pred_path(method="informer", data=args.data)
             if args.use_y_pred_cache

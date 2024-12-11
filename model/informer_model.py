@@ -4,11 +4,13 @@ from typing import Optional
 
 import torch
 
+import dataset
 from Informer2020.exp.exp_informer import Exp_Informer, get_checkpoint_path
 from Informer2020.main_informer import to_setting_str
 from Informer2020.models.model import Informer
 from model.model import Model
 from propose import predict_distr
+from util import calc_sigma
 
 
 def load_default_informer(args: argparse.Namespace) -> Informer:
@@ -43,6 +45,7 @@ class InformerModel(Model):
     def __init__(
         self,
         args: argparse.Namespace,
+        valid_dataset: torch.utils.data.Dataset,
         y_pred_path: Optional[str] = None,
     ) -> None:
         setting = to_setting_str(args=args, itr=0)
@@ -65,6 +68,12 @@ class InformerModel(Model):
 
         self.model.eval()
         self.args = args
+
+        valid_dataloader = dataset.to_dataloader(
+            dataset=valid_dataset, args=args, flag="val"
+        )
+        self.sigma = calc_sigma(data_loader=valid_dataloader, model=self)
+        print(f"sigma for informer: {self.sigma}")
 
     def predict(
         self,
@@ -100,6 +109,8 @@ class InformerModel(Model):
                 return torch.stack([self.y_pred[i] for i in index])
 
         y = predict_distr(self, batch)
+        y[:, 1] += self.sigma
+
         if index is not None:
             for i, _y in zip(index, y):
                 self.y_pred[i] = _y
